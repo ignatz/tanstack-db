@@ -8,3 +8,8 @@ export {
   type QueryCollectionConfig,
   type QueryCollectionUtils,
 } from "./query"
+export {
+  trailBaseCollectionOptions,
+  type TrailBaseCollectionConfig,
+  type TrailBaseCollectionUtils,
+} from "./trailbase"

@@ -236,6 +236,9 @@ importers:
       '@tanstack/store':
         specifier: ^0.7.0
         version: 0.7.0
+      trailbase:
+        specifier: ^0.6.0
+        version: 0.6.0
       typescript:
         specifier: '>=4.7'
         version: 5.8.2
@@ -3337,6 +3340,10 @@ packages:
     resolution: {integrity: sha512-ZZow9HBI5O6EPgSJLUb8n2NKgmVWTwCvHGwFuJlMjvLFqlGG6pjirPhtdsseaLZjSibD8eegzmYpUZwoIlj2cQ==}
     engines: {node: '>=4.0'}
 
+  jwt-decode@4.0.0:
+    resolution: {integrity: sha512-+KJGIyHgkGuIq3IEBNftfhW/LfWhXUIY6OmyVWjliu5KH1y0fw7VQ8YndE2O4qZdMSd9SqbnC8GOcZEy0Om7sA==}
+    engines: {node: '>=18'}
+
   keyv@4.5.4:
     resolution: {integrity: sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw==}
 
@@ -4455,6 +4462,9 @@ packages:
     resolution: {integrity: sha512-tk2G5R2KRwBd+ZN0zaEXpmzdKyOYksXwywulIX95MBODjSzMIuQnQ3m8JxgbhnL1LeVo7lqQKsYa1O3Htl7K5g==}
     engines: {node: '>=18'}
 
+  trailbase@0.6.0:
+    resolution: {integrity: sha512-iPBw+7rq88lIkKyEiXVYb5OFXeqPjNvG2t48C/fYT4IJNEOiHgnZY6sHQtI/bCqkXp7s/WSz/BCGsnmvXCMQcQ==}
+
   tree-kill@1.2.2:
     resolution: {integrity: sha512-L0Orpi8qGpRG//Nd+H90vFB+3iHnue1zSSGmNOOCh1GLJ7rUKVwV2HvijphGQS2UmhUZewS9VgvxYIdgr+fG1A==}
     hasBin: true
@@ -4606,6 +4616,10 @@ packages:
   utils-merge@1.0.1:
     resolution: {integrity: sha512-pMZTvIkT1d+TFGvDOqodOclx0QWkkgi6Tdoa8gC8ffGAAqz9pzPTZWAybbsHHoED/ztMtkv/VoYTYyShUn81hA==}
     engines: {node: '>= 0.4.0'}
+
+  uuid@11.1.0:
+    resolution: {integrity: sha512-0/A9rDy9P7cJ+8w1c9WD9V//9Wj15Ce2MPz8Ri6032usz+NfePxx5AcN3bN+r6ZL6jEo066/yNYB3tn4pQEx+A==}
+    hasBin: true
 
   vary@1.1.2:
     resolution: {integrity: sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg==}
@@ -8071,6 +8085,8 @@ snapshots:
       object.assign: 4.1.7
       object.values: 1.2.1
 
+  jwt-decode@4.0.0: {}
+
   keyv@4.5.4:
     dependencies:
       json-buffer: 3.0.1
@@ -9191,6 +9207,11 @@ snapshots:
     dependencies:
       punycode: 2.3.1
 
+  trailbase@0.6.0:
+    dependencies:
+      jwt-decode: 4.0.0
+      uuid: 11.1.0
+
   tree-kill@1.2.2: {}
 
   ts-api-utils@2.0.1(typescript@5.8.2):
@@ -9348,6 +9369,8 @@ snapshots:
       react: 19.0.0
 
   utils-merge@1.0.1: {}
+
+  uuid@11.1.0: {}
 
   vary@1.1.2: {}
 
