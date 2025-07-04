@@ -98,24 +98,13 @@ describe(`TrailBase Integration`, () => {
       }
     })
 
-    const injectEventResolver = Promise.withResolvers<Event>()
-    const sentEventResolver = Promise.withResolvers<boolean>()
+    const stream = new TransformStream<Event>()
     const injectEvent = async (event: Event) => {
-      injectEventResolver.resolve(event)
-      await sentEventResolver.promise
+      const writer = stream.writable.getWriter()
+      await writer.write(event)
+      writer.releaseLock()
     }
-
-    const cancelResolver = Promise.withResolvers<boolean>()
-    recordApi.subscribe.mockResolvedValue(
-      new ReadableStream({
-        start: async (controller: ReadableStreamDefaultController<Event>) => {
-          const event = await injectEventResolver.promise
-          controller.enqueue(event)
-          setInterval(() => sentEventResolver.resolve(true), 1)
-        },
-        cancel: () => cancelResolver.resolve(true),
-      })
-    )
+    recordApi.subscribe.mockResolvedValue(stream.readable)
 
     const options = setUp(recordApi)
     const collection = createCollection(options)
@@ -138,7 +127,8 @@ describe(`TrailBase Integration`, () => {
 
     // Await cancellation.
     options.utils.cancel()
-    await cancelResolver.promise
+
+    await stream.readable.getReader().closed
 
     // Check that double cancellation is fine.
     options.utils.cancel()
@@ -147,39 +137,14 @@ describe(`TrailBase Integration`, () => {
   it(`receive inserts and delete updates`, async () => {
     // Prepare mock API.
     const recordApi = new MockRecordApi<Data>()
-    recordApi.list.mockImplementation(async (_opts) => {
-      return { records: [] }
-    })
 
-    const injectFirstEventResolver = Promise.withResolvers<Event>()
-    const firstEventSentResolver = Promise.withResolvers<boolean>()
-    const injectFirstEvent = async (event: Event) => {
-      injectFirstEventResolver.resolve(event)
-      await firstEventSentResolver.promise
+    const stream = new TransformStream<Event>()
+    const injectEvent = async (event: Event) => {
+      const writer = stream.writable.getWriter()
+      await writer.write(event)
+      writer.releaseLock()
     }
-
-    const injectSecondEventResolver = Promise.withResolvers<Event>()
-    const secondEventSentResolver = Promise.withResolvers<boolean>()
-    const injectSecondEvent = async (event: Event) => {
-      injectSecondEventResolver.resolve(event)
-      await secondEventSentResolver.promise
-    }
-
-    recordApi.subscribe.mockResolvedValue(
-      new ReadableStream({
-        start: async (controller: ReadableStreamDefaultController<Event>) => {
-          const first = await injectFirstEventResolver.promise
-          controller.enqueue(first)
-          setInterval(() => firstEventSentResolver.resolve(true), 1)
-
-          const second = await injectSecondEventResolver.promise
-          controller.enqueue(second)
-          setInterval(() => secondEventSentResolver.resolve(true), 1)
-
-          controller.close()
-        },
-      })
-    )
+    recordApi.subscribe.mockResolvedValue(stream.readable)
 
     const options = setUp(recordApi)
     const collection = createCollection(options)
@@ -194,15 +159,99 @@ describe(`TrailBase Integration`, () => {
       data: `first`,
     }
 
-    await injectFirstEvent({
+    await injectEvent({
       Insert: data,
     })
 
     expect(collection.state).toEqual(new Map([data].map((d) => [d.id, d])))
 
-    await injectSecondEvent({
+    await injectEvent({
       Delete: data,
     })
+
+    expect(collection.state).toEqual(new Map([]))
+
+    stream.writable.close()
+  })
+
+  it(`local inserts, updates and deletes`, async () => {
+    // Prepare mock API.
+    const recordApi = new MockRecordApi<Data>()
+
+    const stream = new TransformStream<Event>()
+    recordApi.subscribe.mockResolvedValue(stream.readable)
+
+    const createBulkMock = recordApi.createBulk.mockImplementation(
+      async (records: Array<Data>): Promise<Array<string | number>> => {
+        setTimeout(() => {
+          const writer = stream.writable.getWriter()
+          for (const record of records) {
+            writer.write({
+              Insert: record,
+            })
+          }
+          writer.releaseLock()
+        }, 1)
+
+        return records.map((r) => r.id ?? 0)
+      }
+    )
+
+    const options = setUp(recordApi)
+    const collection = createCollection(options)
+
+    // Await initial fetch and assert state.
+    expect(collection.state).toEqual(new Map([]))
+
+    const data: Data = {
+      id: 42,
+      updated: 0,
+      data: `first`,
+    }
+
+    collection.insert(data)
+
+    expect(createBulkMock).toHaveBeenCalledOnce()
+
+    expect(collection.state).toEqual(new Map([[data.id, data]]))
+
+    const updatedData: Data = {
+      ...data,
+      updated: 1,
+    }
+
+    const updateMock = recordApi.update.mockImplementation(
+      async (_id: string | number, record: Partial<Data>) => {
+        expect(record).toEqual({ updated: updatedData.updated })
+        const writer = stream.writable.getWriter()
+        writer.write({
+          Update: record,
+        })
+        writer.releaseLock()
+      }
+    )
+
+    collection.update(data.id, (old: Data) => {
+      old.updated = updatedData.updated
+    })
+
+    expect(updateMock).toHaveBeenCalledOnce()
+
+    expect(collection.state).toEqual(new Map([[updatedData.id, updatedData]]))
+
+    const deleteMock = recordApi.delete.mockImplementation(
+      async (_id: string | number) => {
+        const writer = stream.writable.getWriter()
+        writer.write({
+          Delete: updatedData,
+        })
+        writer.releaseLock()
+      }
+    )
+
+    collection.delete(updatedData.id!)
+
+    expect(deleteMock).toHaveBeenCalledOnce()
 
     expect(collection.state).toEqual(new Map([]))
   })

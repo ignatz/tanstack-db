@@ -135,7 +135,11 @@ export function trailBaseCollectionOptions<TItem extends object>(
         while (true) {
           const { done, value: event } = await reader.read()
 
-          if (done || !event) return
+          if (done || !event) {
+            reader.releaseLock()
+            eventReader = undefined
+            return
+          }
 
           begin()
           let value: TItem | undefined
@@ -227,7 +231,13 @@ export function trailBaseCollectionOptions<TItem extends object>(
       await awaitIds(ids)
     },
     utils: {
-      cancel: () => eventReader?.cancel(),
+      cancel: () => {
+        if (eventReader) {
+          eventReader.cancel()
+          eventReader.releaseLock()
+          eventReader = undefined
+        }
+      },
     },
   }
 }
