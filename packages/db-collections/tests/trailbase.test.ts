@@ -1,9 +1,6 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { createCollection } from "@tanstack/db"
 import { trailBaseCollectionOptions } from "../src/trailbase"
-import type { TrailBaseCollectionUtils } from "../src/trailbase"
-import type { Collection } from "@tanstack/db"
 import type {
   Event,
   FilterOrComposite,
@@ -19,63 +16,58 @@ type Data = {
 }
 
 class MockRecordApi<T> implements RecordApi<T> {
-  list = vi.fn(function (opts?: {
-    pagination?: Pagination
-    order?: Array<string>
-    filters?: Array<FilterOrComposite>
-    count?: boolean
-    expand?: Array<string>
-  }): Promise<ListResponse<T>> {
-    return Promise.resolve({
-      records: [],
-    })
-  })
-
-  read = vi.fn(function (
-    id: string | number,
-    opt?: {
+  list = vi.fn(
+    async (_opts?: {
+      pagination?: Pagination
+      order?: Array<string>
+      filters?: Array<FilterOrComposite>
+      count?: boolean
       expand?: Array<string>
+    }): Promise<ListResponse<T>> => {
+      return { records: [] }
     }
-  ): Promise<T> {
-    return Promise.reject(`read`)
-  })
+  )
 
-  create = vi.fn(function (record: T): Promise<string | number> {
-    return Promise.reject(`create`)
-  })
-  createBulk = vi.fn(function (
-    records: Array<T>
-  ): Promise<Array<string | number>> {
-    return Promise.reject(`createBulk`)
-  })
+  read = vi.fn(
+    async (
+      _id: string | number,
+      _opt?: {
+        expand?: Array<string>
+      }
+    ): Promise<T> => {
+      throw `read`
+    }
+  )
 
-  update = vi.fn(function (
-    id: string | number,
-    record: Partial<T>
-  ): Promise<void> {
-    return Promise.reject(`update`)
+  create = vi.fn(async (_record: T): Promise<string | number> => {
+    throw `create`
   })
-  delete = vi.fn(function (id: string | number): Promise<void> {
-    return Promise.reject(`delete`)
+  createBulk = vi.fn(
+    async (_records: Array<T>): Promise<Array<string | number>> => {
+      throw `createBulk`
+    }
+  )
+
+  update = vi.fn(
+    async (_id: string | number, _record: Partial<T>): Promise<void> => {
+      throw `update`
+    }
+  )
+  delete = vi.fn(async (_id: string | number): Promise<void> => {
+    throw `delete`
   })
-  subscribe = vi.fn(function (
-    id: string | number
-  ): Promise<ReadableStream<Event>> {
-    return Promise.resolve(
-      new ReadableStream({
-        start(controller) {
+  subscribe = vi.fn(
+    async (_id: string | number): Promise<ReadableStream<Event>> => {
+      return new ReadableStream({
+        start: (controller: ReadableStreamDefaultController<Event>) => {
           controller.close()
         },
-        // pull(controller) {},
-        // cancel() {},
       })
-    )
-  })
+    }
+  )
 }
 
-function setUp(
-  recordApi: MockRecordApi<Data>
-): Collection<Data, string | number, TrailBaseCollectionUtils> {
+function setUp(recordApi: MockRecordApi<Data>) {
   // Get the options with utilities
   const options = trailBaseCollectionOptions({
     recordApi,
@@ -83,75 +75,75 @@ function setUp(
       item.id ?? Math.round(Math.random() * 100000),
   })
 
-  return createCollection<Data, string | number, TrailBaseCollectionUtils>(
-    options
-  )
-}
-
-// NOTE: ideally we'd just use Promise.withResolver.
-class Completer<T> {
-  public readonly promise: Promise<T>
-  public complete: (value: PromiseLike<T> | T) => void
-  private reject: (reason?: any) => void
-
-  public constructor() {
-    this.promise = new Promise<T>((resolve, reject) => {
-      this.complete = resolve
-      this.reject = reject
-    })
-  }
+  return options
 }
 
 describe(`TrailBase Integration`, () => {
-  let collection: Collection<Data, string | number, TrailBaseCollectionUtils>
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
-  // beforeEach(() => {
-  //   vi.clearAllMocks()
-  //
-  //   const recordApi = new MockRecordApi<Data>()
-  //
-  //   // Create collection with Electric configuration
-  //   const config = {
-  //     recordApi,
-  //     getKey: (item: Data): number | number =>
-  //       item.id ?? Math.round(Math.random() * 100000),
-  //   }
-  //
-  //   // Get the options with utilities
-  //   const options = trailBaseCollectionOptions(config)
-  //
-  //   // Create collection with Electric configuration using the new utility exposure pattern
-  //   collection = createCollection<
-  //     Data,
-  //     string | number,
-  //     TrailBaseCollectionUtils
-  //   >(options)
-  // })
-
-  it(`initial fetch`, async () => {
-    const recordApi = new MockRecordApi<Data>()
-
-    const records: Data[] = [
+  it(`initial fetch and simple update`, async () => {
+    const records: Array<Data> = [
       {
         id: 0,
         updated: 0,
-        data: "first",
+        data: `first`,
       },
     ]
 
-    const resolver = new Completer<boolean>()
-    recordApi.list.mockImplementation(async (opts) => {
-      setInterval(() => resolver.complete(true), 100)
+    // Prepare mock API.
+    const recordApi = new MockRecordApi<Data>()
+    const listResolver = Promise.withResolvers<boolean>()
+    recordApi.list.mockImplementation(async (_opts) => {
+      setInterval(() => listResolver.resolve(true), 1)
       return {
         total_count: records.length,
         records,
       }
     })
 
-    const collection = setUp(recordApi)
+    const injectEventResolver = Promise.withResolvers<Event>()
+    const sentEventResolver = Promise.withResolvers<boolean>()
+    const injectEvent = async (event: Event) => {
+      injectEventResolver.resolve(event)
+      await sentEventResolver.promise
+    }
 
-    await resolver.promise
+    const cancelResolver = Promise.withResolvers<boolean>()
+    recordApi.subscribe.mockResolvedValue(
+      new ReadableStream({
+        start: (controller: ReadableStreamDefaultController<Event>) => {
+          injectEventResolver.promise.then((event) => {
+            controller.enqueue(event)
+            setInterval(() => sentEventResolver.resolve(true), 1)
+          })
+        },
+        cancel: () => cancelResolver.resolve(true),
+      })
+    )
 
+    const options = setUp(recordApi)
+    const collection = createCollection(options)
+
+    // Await initial fetch and assert state.
+    await listResolver.promise
     expect(collection.state).toEqual(new Map(records.map((d) => [d.id, d])))
+
+    // Inject an update event and assert state.
+    const updatedRecord: Data = {
+      ...records[0]!,
+      updated: 1,
+    }
+
+    await injectEvent({ Update: updatedRecord })
+
+    expect(collection.state).toEqual(
+      new Map([updatedRecord].map((d) => [d.id, d]))
+    )
+
+    // Await cancellation.
+    options.utils.cancel()
+    await cancelResolver.promise
   })
 })

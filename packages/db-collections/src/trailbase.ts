@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
 import { Store } from "@tanstack/store"
-import type { RecordApi } from "trailbase"
+import type { Event, RecordApi } from "trailbase"
 
 import type { CollectionConfig, SyncConfig, UtilsRecord } from "@tanstack/db"
 
@@ -22,9 +22,9 @@ export interface TrailBaseCollectionConfig<
 
 export type AwaitTxIdFn = (txId: string, timeout?: number) => Promise<boolean>
 
-export type RefetchFn = () => Promise<void>
-
-export interface TrailBaseCollectionUtils extends UtilsRecord {}
+export interface TrailBaseCollectionUtils extends UtilsRecord {
+  cancel: () => void
+}
 
 export function trailBaseCollectionOptions<TItem extends object>(
   config: TrailBaseCollectionConfig<TItem>
@@ -84,6 +84,8 @@ export function trailBaseCollectionOptions<TItem extends object>(
   }, 120 * 1000)
 
   type SyncParams = Parameters<SyncConfig<TItem>[`sync`]>[0]
+
+  let eventReader: ReadableStreamDefaultReader<Event> | undefined
   const sync = {
     sync: (params: SyncParams) => {
       const { begin, write, commit } = params
@@ -128,37 +130,35 @@ export function trailBaseCollectionOptions<TItem extends object>(
       // Afterwards subscribe.
       async function subscribe() {
         const eventStream = await config.recordApi.subscribe(`*`)
+        const reader = (eventReader = eventStream.getReader())
 
-        eventStream
-          .getReader()
-          .read()
-          .then(({ done: _, value: event }) => {
-            if (!event) return
+        reader.read().then(({ done: _, value: event }) => {
+          if (!event) return
 
-            begin()
-            let value: TItem | undefined
-            if (`Insert` in event) {
-              value = event.Insert as TItem
-              write({ type: `insert`, value })
-            } else if (`Delete` in event) {
-              value = event.Delete as TItem
-              write({ type: `delete`, value })
-            } else if (`Update` in event) {
-              value = event.Update as TItem
-              write({ type: `update`, value })
-            } else {
-              console.error(`Error: ${event.Error}`)
-            }
-            commit()
+          begin()
+          let value: TItem | undefined
+          if (`Insert` in event) {
+            value = event.Insert as TItem
+            write({ type: `insert`, value })
+          } else if (`Delete` in event) {
+            value = event.Delete as TItem
+            write({ type: `delete`, value })
+          } else if (`Update` in event) {
+            value = event.Update as TItem
+            write({ type: `update`, value })
+          } else {
+            console.error(`Error: ${event.Error}`)
+          }
+          commit()
 
-            if (value) {
-              seenIds.setState((curr) => {
-                const newIds = new Map(curr)
-                newIds.set(String(getKey(value)), Date.now())
-                return newIds
-              })
-            }
-          })
+          if (value) {
+            seenIds.setState((curr) => {
+              const newIds = new Map(curr)
+              newIds.set(String(getKey(value)), Date.now())
+              return newIds
+            })
+          }
+        })
       }
 
       initialFetch().then(() => subscribe())
@@ -224,6 +224,8 @@ export function trailBaseCollectionOptions<TItem extends object>(
       // DB by the subscription.
       await awaitIds(ids)
     },
-    utils: {},
+    utils: {
+      cancel: () => eventReader?.cancel(),
+    },
   }
 }
