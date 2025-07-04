@@ -5,7 +5,7 @@ import type { TrailBaseCollectionUtils } from "../src/trailbase"
 import type {
   Collection,
 } from "@tanstack/db"
-import { Client } from "trailbase"
+import { initClient, type Client } from "trailbase"
 
 type Data = {
   id: number | null;
@@ -19,7 +19,7 @@ describe(`TrailBase Integration`, () => {
   beforeEach(() => {
     vi.clearAllMocks()
 
-    const client = Client.init("http://localhost:4000");
+    const client: Client = initClient("http://localhost:4000");
     // Reset mock subscriber
     // mockSubscribe.mockImplementation((callback) => {
     //   subscriber = callback
@@ -28,7 +28,7 @@ describe(`TrailBase Integration`, () => {
 
     // Create collection with Electric configuration
     const config = {
-      recordApi: client.records("data"),
+      recordApi: client.records<Data>("data"),
       getKey: (item: Data): number | number => item.id ?? Math.round(Math.random() * 100000),
     }
 

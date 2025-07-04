@@ -227,8 +227,8 @@ importers:
         specifier: ^19.1.0
         version: 19.1.0(react@19.1.0)
       trailbase:
-        specifier: ^0.6.0
-        version: 0.6.0
+        specifier: ^0.7.0
+        version: 0.7.0
     devDependencies:
       '@eslint/js':
         specifier: ^9.30.0
@@ -304,8 +304,8 @@ importers:
         specifier: ^0.7.0
         version: 0.7.0
       trailbase:
-        specifier: ^0.6.0
-        version: 0.6.0
+        specifier: ^0.7.0
+        version: 0.7.0
       typescript:
         specifier: '>=4.7'
         version: 5.8.2
@@ -4858,8 +4858,8 @@ packages:
     resolution: {integrity: sha512-tk2G5R2KRwBd+ZN0zaEXpmzdKyOYksXwywulIX95MBODjSzMIuQnQ3m8JxgbhnL1LeVo7lqQKsYa1O3Htl7K5g==}
     engines: {node: '>=18'}
 
-  trailbase@0.6.0:
-    resolution: {integrity: sha512-iPBw+7rq88lIkKyEiXVYb5OFXeqPjNvG2t48C/fYT4IJNEOiHgnZY6sHQtI/bCqkXp7s/WSz/BCGsnmvXCMQcQ==}
+  trailbase@0.7.0:
+    resolution: {integrity: sha512-pe7vdsBB2N/xSG76TCcNz+v/q5yx4oq976kLjhMaVkGIzTomvh9Y1Y30VkYrLvzwe1xbdBRAvUNy2XHQj4n42Q==}
 
   tree-kill@1.2.2:
     resolution: {integrity: sha512-L0Orpi8qGpRG//Nd+H90vFB+3iHnue1zSSGmNOOCh1GLJ7rUKVwV2HvijphGQS2UmhUZewS9VgvxYIdgr+fG1A==}
@@ -6738,7 +6738,7 @@ snapshots:
 
   '@testing-library/dom@10.4.0':
     dependencies:
-      '@babel/code-frame': 7.26.2
+      '@babel/code-frame': 7.27.1
       '@babel/runtime': 7.26.10
       '@types/aria-query': 5.0.4
       aria-query: 5.3.0
@@ -10125,7 +10125,7 @@ snapshots:
     dependencies:
       punycode: 2.3.1
 
-  trailbase@0.6.0:
+  trailbase@0.7.0:
     dependencies:
       jwt-decode: 4.0.0
       uuid: 11.1.0

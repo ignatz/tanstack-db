@@ -19,7 +19,7 @@
     "@tanstack/store": "^0.7.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "trailbase": "^0.6.0"
+    "trailbase": "^0.7.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.0",

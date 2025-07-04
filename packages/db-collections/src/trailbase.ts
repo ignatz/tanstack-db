@@ -1,7 +1,8 @@
-import { RecordApi } from "trailbase";
+/* eslint-disable @typescript-eslint/no-unnecessary-condition */
+import { Store } from "@tanstack/store"
+import type { RecordApi } from "trailbase"
 
-import type { CollectionConfig, SyncConfig, UtilsRecord } from "@tanstack/db";
-import { Store } from "@tanstack/store";
+import type { CollectionConfig, SyncConfig, UtilsRecord } from "@tanstack/db"
 
 /**
  * Configuration interface for TrailbaseCollection
@@ -10,215 +11,215 @@ export interface TrailBaseCollectionConfig<
   TItem extends object,
   TKey extends string | number = string | number,
 > extends Omit<
-  CollectionConfig<TItem, TKey>,
-  "sync" | "onInsert" | "onUpdate" | "onDelete"
-> {
+    CollectionConfig<TItem, TKey>,
+    `sync` | `onInsert` | `onUpdate` | `onDelete`
+  > {
   /**
    * Record API name
    */
-  recordApi: RecordApi;
+  recordApi: RecordApi<TItem>
 }
 
-export type AwaitTxIdFn = (txId: string, timeout?: number) => Promise<boolean>;
+export type AwaitTxIdFn = (txId: string, timeout?: number) => Promise<boolean>
 
-export type RefetchFn = () => Promise<void>;
+export type RefetchFn = () => Promise<void>
 
-export interface TrailBaseCollectionUtils extends UtilsRecord {
-}
+export interface TrailBaseCollectionUtils extends UtilsRecord {}
 
 export function trailBaseCollectionOptions<TItem extends object>(
-  config: TrailBaseCollectionConfig<TItem>,
+  config: TrailBaseCollectionConfig<TItem>
 ): CollectionConfig<TItem> & { utils: TrailBaseCollectionUtils } {
-  const records = config.recordApi;
-  const getKey = config.getKey;
+  const getKey = config.getKey
 
-  const seenIds = new Store(new Map<string, number>());
+  const seenIds = new Store(new Map<string, number>())
 
   const awaitIds = (
-    ids: string[],
-    timeout: number = 120 * 1000,
+    ids: Array<string>,
+    timeout: number = 120 * 1000
   ): Promise<void> => {
     const completed = (value: Map<string, number>) =>
-      ids.every((id) => value.has(id));
+      ids.every((id) => value.has(id))
     if (completed(seenIds.state)) {
-      return Promise.resolve();
+      return Promise.resolve()
     }
 
     return new Promise<void>((resolve, reject) => {
       const timeoutId = setTimeout(() => {
-        unsubscribe();
-        reject(new Error(`Timeout waiting for ids: ${ids}`));
-      }, timeout);
+        unsubscribe()
+        reject(new Error(`Timeout waiting for ids: ${ids}`))
+      }, timeout)
 
       const unsubscribe = seenIds.subscribe((value) => {
         if (completed(value.currentVal)) {
-          clearTimeout(timeoutId);
-          unsubscribe();
-          resolve();
+          clearTimeout(timeoutId)
+          unsubscribe()
+          resolve()
         }
-      });
-    });
-  };
+      })
+    })
+  }
 
-  const weakSeenIds = new WeakRef(seenIds);
+  const weakSeenIds = new WeakRef(seenIds)
   const cleanupTimer = setInterval(() => {
-    const seen = weakSeenIds.deref();
+    const seen = weakSeenIds.deref()
     if (seen) {
       seen.setState((curr) => {
-        const now = Date.now();
-        let anyExpired = false;
+        const now = Date.now()
+        let anyExpired = false
 
         const notExpired = Array.from(curr.entries()).filter(([_, v]) => {
-          const expired = now - v > 300 * 1000;
-          anyExpired = anyExpired || expired;
-          return !expired;
-        });
+          const expired = now - v > 300 * 1000
+          anyExpired = anyExpired || expired
+          return !expired
+        })
 
         if (anyExpired) {
-          return new Map(notExpired);
+          return new Map(notExpired)
         }
-        return curr;
-      });
+        return curr
+      })
     } else {
-      clearInterval(cleanupTimer);
+      clearInterval(cleanupTimer)
     }
-  }, 120 * 1000);
+  }, 120 * 1000)
 
-  type SyncParams = Parameters<SyncConfig<TItem>[`sync`]>[0];
+  type SyncParams = Parameters<SyncConfig<TItem>[`sync`]>[0]
   const sync = {
     sync: (params: SyncParams) => {
-      const { begin, write, commit } = params;
+      const { begin, write, commit } = params
 
       // Initial fetch.
       async function initialFetch() {
-        let response = await records.list<TItem>({ count: true });
-        let cursor = response.cursor;
-        let got = 0;
+        let response = await config.recordApi.list({ count: true })
+        let cursor = response.cursor
+        let got = 0
 
-        begin();
+        begin()
 
         while (true) {
-          const length = response.records.length;
+          const length = response.records.length
           if (length === 0) {
-            break;
+            break
           }
 
-          got = got + length;
+          got = got + length
           for (const item of response.records) {
-            write({ type: "insert", value: item as TItem });
+            write({ type: `insert`, value: item })
           }
 
-          response = await records.list<TItem>({
+          response = await config.recordApi.list({
             pagination: {
               cursor,
               offset: cursor === undefined ? got : undefined,
             },
-          });
-          cursor = response.cursor;
+          })
+          cursor = response.cursor
         }
 
-        commit();
+        commit()
       }
 
       // Afterwards subscribe.
       async function subscribe() {
-        const eventStream = await records.subscribe("*");
+        const eventStream = await config.recordApi.subscribe(`*`)
 
-        eventStream.getReader().read().then(({ done: _, value: event }) => {
-          if (!event) return;
+        eventStream
+          .getReader()
+          .read()
+          .then(({ done: _, value: event }) => {
+            if (!event) return
 
-          begin();
-          let value: TItem | undefined;
-          if ("Insert" in event) {
-            value = event.Insert as TItem;
-            write({ type: "insert", value });
-          } else if ("Delete" in event) {
-            value = event.Delete as TItem;
-            write({ type: "delete", value });
-          } else if ("Update" in event) {
-            value = event.Update as TItem;
-            write({ type: "update", value });
-          } else {
-            console.error(`Error: ${event.Error}`);
-          }
-          commit();
+            begin()
+            let value: TItem | undefined
+            if (`Insert` in event) {
+              value = event.Insert as TItem
+              write({ type: `insert`, value })
+            } else if (`Delete` in event) {
+              value = event.Delete as TItem
+              write({ type: `delete`, value })
+            } else if (`Update` in event) {
+              value = event.Update as TItem
+              write({ type: `update`, value })
+            } else {
+              console.error(`Error: ${event.Error}`)
+            }
+            commit()
 
-          if (value) {
-            seenIds.setState((curr) => {
-              const newIds = new Map(curr);
-              newIds.set(String(getKey(value)), Date.now());
-              return newIds;
-            });
-          }
-        })
-      };
-
+            if (value) {
+              seenIds.setState((curr) => {
+                const newIds = new Map(curr)
+                newIds.set(String(getKey(value)), Date.now())
+                return newIds
+              })
+            }
+          })
+      }
 
       initialFetch().then(() => {
-        subscribe();
-      });
+        subscribe()
+      })
     },
     // Expose the getSyncMetadata function
     getSyncMetadata: undefined,
-  };
+  }
 
   return {
     sync,
     getKey,
-    onInsert: async (params): Promise<(number | string)[]> => {
-      const ids = await records.createBulk(
+    onInsert: async (params): Promise<Array<number | string>> => {
+      const ids = await config.recordApi.createBulk(
         params.transaction.mutations.map((tx) => {
-          const { type, changes } = tx;
-          if (type !== "insert") {
-            throw new Error(`Expected 'insert', got: ${type}`);
+          const { type, changes } = tx
+          if (type !== `insert`) {
+            throw new Error(`Expected 'insert', got: ${type}`)
           }
-          return changes as TItem;
-        }),
-      );
+          return changes as TItem
+        })
+      )
 
       // The optimistic mutation overlay is removed on return, so at this point
       // we have to ensure that the new record was properly added to the local
       // DB by the subscription.
-      await awaitIds(ids.map((id) => String(id)));
+      await awaitIds(ids.map((id) => String(id)))
 
-      return ids;
+      return ids
     },
     onUpdate: async (params) => {
-      const ids: string[] = await Promise.all(
+      const ids: Array<string> = await Promise.all(
         params.transaction.mutations.map(async (tx) => {
-          const { type, changes, key } = tx;
-          if (type !== "update") {
-            throw new Error(`Expected 'update', got: ${type}`);
+          const { type, changes, key } = tx
+          if (type !== `update`) {
+            throw new Error(`Expected 'update', got: ${type}`)
           }
 
-          await records.update(key, changes);
-          return String(key);
-        }),
-      );
+          await config.recordApi.update(key, changes)
+          return String(key)
+        })
+      )
 
       // The optimistic mutation overlay is removed on return, so at this point
       // we have to ensure that the new record was properly updated in the local
       // DB by the subscription.
-      await awaitIds(ids);
+      await awaitIds(ids)
     },
     onDelete: async (params) => {
-      const ids: string[] = await Promise.all(
+      const ids: Array<string> = await Promise.all(
         params.transaction.mutations.map(async (tx) => {
-          const { type, key } = tx;
-          if (type !== "delete") {
-            throw new Error(`Expected 'delete', got: ${type}`);
+          const { type, key } = tx
+          if (type !== `delete`) {
+            throw new Error(`Expected 'delete', got: ${type}`)
           }
 
-          await records.delete(key);
-          return String(key);
-        }),
-      );
+          await config.recordApi.delete(key)
+          return String(key)
+        })
+      )
 
       // The optimistic mutation overlay is removed on return, so at this point
       // we have to ensure that the new record was properly updated in the local
       // DB by the subscription.
-      await awaitIds(ids);
+      await awaitIds(ids)
     },
     utils: {},
-  };
+  }
 }

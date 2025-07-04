@@ -7,7 +7,7 @@
     "@tanstack/query-core": "^5.75.7",
     "@standard-schema/spec": "^1.0.0",
     "@tanstack/store": "^0.7.0",
-    "trailbase": "^0.6.0"
+    "trailbase": "^0.7.0"
   },
   "devDependencies": {
     "@electric-sql/client": "1.0.0",
