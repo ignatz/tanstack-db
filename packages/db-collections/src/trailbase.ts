@@ -132,8 +132,10 @@ export function trailBaseCollectionOptions<TItem extends object>(
         const eventStream = await config.recordApi.subscribe(`*`)
         const reader = (eventReader = eventStream.getReader())
 
-        reader.read().then(({ done: _, value: event }) => {
-          if (!event) return
+        while (true) {
+          const { done, value: event } = await reader.read()
+
+          if (done || !event) return
 
           begin()
           let value: TItem | undefined
@@ -158,7 +160,7 @@ export function trailBaseCollectionOptions<TItem extends object>(
               return newIds
             })
           }
-        })
+        }
       }
 
       initialFetch().then(() => subscribe())

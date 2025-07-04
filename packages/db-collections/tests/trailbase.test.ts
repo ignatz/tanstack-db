@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { createCollection } from "@tanstack/db"
 import { trailBaseCollectionOptions } from "../src/trailbase"
 import type {
@@ -79,11 +79,7 @@ function setUp(recordApi: MockRecordApi<Data>) {
 }
 
 describe(`TrailBase Integration`, () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
-  it(`initial fetch and simple update`, async () => {
+  it(`initial fetch, receive update and cancel`, async () => {
     const records: Array<Data> = [
       {
         id: 0,
@@ -98,7 +94,6 @@ describe(`TrailBase Integration`, () => {
     recordApi.list.mockImplementation(async (_opts) => {
       setInterval(() => listResolver.resolve(true), 1)
       return {
-        total_count: records.length,
         records,
       }
     })
@@ -113,11 +108,10 @@ describe(`TrailBase Integration`, () => {
     const cancelResolver = Promise.withResolvers<boolean>()
     recordApi.subscribe.mockResolvedValue(
       new ReadableStream({
-        start: (controller: ReadableStreamDefaultController<Event>) => {
-          injectEventResolver.promise.then((event) => {
-            controller.enqueue(event)
-            setInterval(() => sentEventResolver.resolve(true), 1)
-          })
+        start: async (controller: ReadableStreamDefaultController<Event>) => {
+          const event = await injectEventResolver.promise
+          controller.enqueue(event)
+          setInterval(() => sentEventResolver.resolve(true), 1)
         },
         cancel: () => cancelResolver.resolve(true),
       })
@@ -145,5 +139,71 @@ describe(`TrailBase Integration`, () => {
     // Await cancellation.
     options.utils.cancel()
     await cancelResolver.promise
+
+    // Check that double cancellation is fine.
+    options.utils.cancel()
+  })
+
+  it(`receive inserts and delete updates`, async () => {
+    // Prepare mock API.
+    const recordApi = new MockRecordApi<Data>()
+    recordApi.list.mockImplementation(async (_opts) => {
+      return { records: [] }
+    })
+
+    const injectFirstEventResolver = Promise.withResolvers<Event>()
+    const firstEventSentResolver = Promise.withResolvers<boolean>()
+    const injectFirstEvent = async (event: Event) => {
+      injectFirstEventResolver.resolve(event)
+      await firstEventSentResolver.promise
+    }
+
+    const injectSecondEventResolver = Promise.withResolvers<Event>()
+    const secondEventSentResolver = Promise.withResolvers<boolean>()
+    const injectSecondEvent = async (event: Event) => {
+      injectSecondEventResolver.resolve(event)
+      await secondEventSentResolver.promise
+    }
+
+    recordApi.subscribe.mockResolvedValue(
+      new ReadableStream({
+        start: async (controller: ReadableStreamDefaultController<Event>) => {
+          const first = await injectFirstEventResolver.promise
+          controller.enqueue(first)
+          setInterval(() => firstEventSentResolver.resolve(true), 1)
+
+          const second = await injectSecondEventResolver.promise
+          controller.enqueue(second)
+          setInterval(() => secondEventSentResolver.resolve(true), 1)
+
+          controller.close()
+        },
+      })
+    )
+
+    const options = setUp(recordApi)
+    const collection = createCollection(options)
+
+    // Await initial fetch and assert state.
+    expect(collection.state).toEqual(new Map([]))
+
+    // Inject an update event and assert state.
+    const data: Data = {
+      id: 0,
+      updated: 0,
+      data: `first`,
+    }
+
+    await injectFirstEvent({
+      Insert: data,
+    })
+
+    expect(collection.state).toEqual(new Map([data].map((d) => [d.id, d])))
+
+    await injectSecondEvent({
+      Delete: data,
+    })
+
+    expect(collection.state).toEqual(new Map([]))
   })
 })
