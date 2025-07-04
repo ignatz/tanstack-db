@@ -90,7 +90,12 @@ export function trailBaseCollectionOptions<TItem extends object>(
 
       // Initial fetch.
       async function initialFetch() {
-        let response = await config.recordApi.list({ count: true })
+        const limit = 1024
+        let response = await config.recordApi.list({
+          pagination: {
+            limit,
+          },
+        })
         let cursor = response.cursor
         let got = 0
 
@@ -98,17 +103,18 @@ export function trailBaseCollectionOptions<TItem extends object>(
 
         while (true) {
           const length = response.records.length
-          if (length === 0) {
-            break
-          }
+          if (length === 0) break
 
           got = got + length
           for (const item of response.records) {
             write({ type: `insert`, value: item })
           }
 
+          if (length < limit) break
+
           response = await config.recordApi.list({
             pagination: {
+              limit,
               cursor,
               offset: cursor === undefined ? got : undefined,
             },
@@ -155,9 +161,7 @@ export function trailBaseCollectionOptions<TItem extends object>(
           })
       }
 
-      initialFetch().then(() => {
-        subscribe()
-      })
+      initialFetch().then(() => subscribe())
     },
     // Expose the getSyncMetadata function
     getSyncMetadata: undefined,
