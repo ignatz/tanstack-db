@@ -158,36 +158,26 @@ interface CommentRecord {
 /**
  * Parse functions - only transform types that differ between DB and app
  */
-const parseUser = (record: UserRecord): User => ({
-  id: parseTrailBaseId(record.id),
-  name: record.name,
-  email: record.email,
-  age: record.age,
-  isActive: Boolean(record.isActive),
-  createdAt: new Date(record.createdAt),
-  metadata: record.metadata ? JSON.parse(record.metadata) : null,
-  deletedAt: record.deletedAt ? new Date(record.deletedAt) : null,
-})
+const parseUser = {
+  id: (id) => parseTrailBaseId(id),
+  isActive: (isActive) => Boolean(isActive),
+  createdAt: (createdAt) => new Date(createdAt),
+  metadata: (m) => m ? JSON.parse(m) : null,
+  deletedAt: (d) => d ? new Date(d) : null,
+}
 
-const parsePost = (record: PostRecord): Post => ({
-  id: parseTrailBaseId(record.id),
-  userId: record.userId,
-  title: record.title,
-  content: record.content,
-  viewCount: record.viewCount,
-  largeViewCount: BigInt(record.largeViewCount),
-  publishedAt: record.publishedAt ? new Date(record.publishedAt) : null,
-  deletedAt: record.deletedAt ? new Date(record.deletedAt) : null,
-})
+const parsePost = {
+  id: (id) => parseTrailBaseId(id),
+  largeViewCount: (l) => BigInt(l),
+  publishedAt: (v) => v ? new Date(v) : null,
+  deletedAt: (d) => d ? new Date(d) : null,
+}
 
-const parseComment = (record: CommentRecord): Comment => ({
-  id: parseTrailBaseId(record.id),
-  postId: record.postId,
-  userId: record.userId,
-  text: record.text,
-  createdAt: new Date(record.createdAt),
-  deletedAt: record.deletedAt ? new Date(record.deletedAt) : null,
-})
+const parseComment = {
+  id: (id) => parseTrailBaseId(id),
+  createdAt: (v) => new Date(v),
+  deletedAt: (d) => d ? new Date(d) : null,
+}
 
 /**
  * Serialize functions - transform app types to DB storage types
@@ -225,57 +215,28 @@ const serializeComment = (comment: Comment): CommentRecord => ({
 })
 
 /**
- * Partial serializers for updates
+ * Serialize functions - transform app types to DB storage types
+ * ID is base64 encoded for TrailBase BLOB storage
  */
-const serializeUserPartial = (user: Partial<User>): Partial<UserRecord> => {
-  const result: Partial<UserRecord> = {}
-  if (user.id !== undefined) result.id = uuidToBase64(user.id)
-  if (user.name !== undefined) result.name = user.name
-  if (user.email !== undefined) result.email = user.email
-  if (user.age !== undefined) result.age = user.age
-  if (user.isActive !== undefined) result.isActive = user.isActive ? 1 : 0
-  if (user.createdAt !== undefined)
-    result.createdAt = user.createdAt.toISOString()
-  if (user.metadata !== undefined)
-    result.metadata = user.metadata ? JSON.stringify(user.metadata) : null
-  if (user.deletedAt !== undefined)
-    result.deletedAt = user.deletedAt ? user.deletedAt.toISOString() : null
-  return result
+const serializerUser = {
+  id: (id) => uuidToBase64(id),
+  isActive: (a) => a ? 1 : 0,
+  createdAt: (c) => c.toISOString(),
+  metadata: (m) => m ? JSON.stringify(m) : null,
+  deletedAt: (d) => d ? d.toISOString() : null,
 }
 
-const serializePostPartial = (post: Partial<Post>): Partial<PostRecord> => {
-  const result: Partial<PostRecord> = {}
-  if (post.id !== undefined) result.id = uuidToBase64(post.id)
-  if (post.userId !== undefined) result.userId = post.userId
-  if (post.title !== undefined) result.title = post.title
-  if (post.content !== undefined) result.content = post.content
-  if (post.viewCount !== undefined) result.viewCount = post.viewCount
-  if (post.largeViewCount !== undefined)
-    result.largeViewCount = post.largeViewCount.toString()
-  if (post.publishedAt !== undefined)
-    result.publishedAt = post.publishedAt
-      ? post.publishedAt.toISOString()
-      : null
-  if (post.deletedAt !== undefined)
-    result.deletedAt = post.deletedAt ? post.deletedAt.toISOString() : null
-  return result
+const serializerPost = {
+  id: (id) => uuidToBase64(id),
+  largeViewCount: (v) => v.toString(),
+  publishedAt: (v) => v ? v.toISOString() : null,
+  deletedAt: (d) => d ? d.toISOString() : null,
 }
 
-const serializeCommentPartial = (
-  comment: Partial<Comment>,
-): Partial<CommentRecord> => {
-  const result: Partial<CommentRecord> = {}
-  if (comment.id !== undefined) result.id = uuidToBase64(comment.id)
-  if (comment.postId !== undefined) result.postId = comment.postId
-  if (comment.userId !== undefined) result.userId = comment.userId
-  if (comment.text !== undefined) result.text = comment.text
-  if (comment.createdAt !== undefined)
-    result.createdAt = comment.createdAt.toISOString()
-  if (comment.deletedAt !== undefined)
-    result.deletedAt = comment.deletedAt
-      ? comment.deletedAt.toISOString()
-      : null
-  return result
+const serializerComment = {
+  id: (id) => uuidToBase64(id),
+  createdAt: (v) => v.toISOString(),
+  deletedAt: (d) => d ? d.toISOString() : null,
 }
 
 /**
@@ -299,8 +260,7 @@ function createCollectionsForSyncMode(
       startSync: true,
       syncMode,
       parse: parseUser,
-      serialize: serializeUser,
-      serializePartial: serializeUserPartial,
+      serialize: serializerUser,
     }),
   )
 
@@ -312,8 +272,7 @@ function createCollectionsForSyncMode(
       startSync: true,
       syncMode,
       parse: parsePost,
-      serialize: serializePost,
-      serializePartial: serializePostPartial,
+      serialize: serializerPost,
     }),
   )
 
@@ -325,8 +284,7 @@ function createCollectionsForSyncMode(
       startSync: true,
       syncMode,
       parse: parseComment,
-      serialize: serializeComment,
-      serializePartial: serializeCommentPartial,
+      serialize: serializerComment,
     }),
   )
 
@@ -346,34 +304,6 @@ describe(`TrailBase Collection E2E Tests`, () => {
   // Collections for each sync mode
   let eagerCollections: ReturnType<typeof createCollectionsForSyncMode>
   let onDemandCollections: ReturnType<typeof createCollectionsForSyncMode>
-
-  // Progressive collections with test hooks (created separately)
-  let progressiveUsers: Collection<User>
-  let progressivePosts: Collection<Post>
-  let progressiveComments: Collection<Comment>
-
-  // Control mechanisms for progressive collections test hooks
-  const usersUpToDateControl = {
-    current: null as (() => void) | null,
-    createPromise: () =>
-      new Promise<void>((resolve) => {
-        usersUpToDateControl.current = resolve
-      }),
-  }
-  const postsUpToDateControl = {
-    current: null as (() => void) | null,
-    createPromise: () =>
-      new Promise<void>((resolve) => {
-        postsUpToDateControl.current = resolve
-      }),
-  }
-  const commentsUpToDateControl = {
-    current: null as (() => void) | null,
-    createPromise: () =>
-      new Promise<void>((resolve) => {
-        commentsUpToDateControl.current = resolve
-      }),
-  }
 
   beforeAll(async () => {
     const baseUrl = inject(`baseUrl`)
@@ -483,47 +413,6 @@ describe(`TrailBase Collection E2E Tests`, () => {
       `ondemand`,
     )
 
-    // Create progressive collections with test hooks
-    // These use startSync: false so tests can control when sync starts
-    progressiveUsers = createCollection(
-      trailBaseCollectionOptions({
-        id: `trailbase-e2e-users-progressive-${testId}`,
-        recordApi: usersRecordApi,
-        getKey: (item: User) => item.id,
-        startSync: false, // Don't start immediately - tests will start when ready
-        syncMode: `progressive`,
-        parse: parseUser,
-        serialize: serializeUser,
-        serializePartial: serializeUserPartial,
-      }),
-    ) as Collection<User>
-
-    progressivePosts = createCollection(
-      trailBaseCollectionOptions({
-        id: `trailbase-e2e-posts-progressive-${testId}`,
-        recordApi: postsRecordApi,
-        getKey: (item: Post) => item.id,
-        startSync: false,
-        syncMode: `progressive`,
-        parse: parsePost,
-        serialize: serializePost,
-        serializePartial: serializePostPartial,
-      }),
-    ) as Collection<Post>
-
-    progressiveComments = createCollection(
-      trailBaseCollectionOptions({
-        id: `trailbase-e2e-comments-progressive-${testId}`,
-        recordApi: commentsRecordApi,
-        getKey: (item: Comment) => item.id,
-        startSync: false,
-        syncMode: `progressive`,
-        parse: parseComment,
-        serialize: serializeComment,
-        serializePartial: serializeCommentPartial,
-      }),
-    ) as Collection<Comment>
-
     // Wait for eager collections to sync (they need to fetch all data before marking ready)
     console.log('Calling preload on eager collections...')
     await Promise.all([
@@ -578,10 +467,6 @@ describe(`TrailBase Collection E2E Tests`, () => {
       onDemandCollections.comments.preload(),
     ])
 
-    // Note: We DON'T call preload() on progressive collections here
-    // because the test hooks will block. Individual progressive tests
-    // will handle preload and release as needed.
-
     config = {
       collections: {
         eager: {
@@ -593,11 +478,6 @@ describe(`TrailBase Collection E2E Tests`, () => {
           users: onDemandCollections.users,
           posts: onDemandCollections.posts,
           comments: onDemandCollections.comments,
-        },
-        progressive: {
-          users: progressiveUsers,
-          posts: progressivePosts,
-          comments: progressiveComments,
         },
       },
       hasReplicationLag: true, // TrailBase has async subscription-based sync
@@ -641,9 +521,6 @@ describe(`TrailBase Collection E2E Tests`, () => {
           onDemandCollections.users.cleanup(),
           onDemandCollections.posts.cleanup(),
           onDemandCollections.comments.cleanup(),
-          progressiveUsers.cleanup(),
-          progressivePosts.cleanup(),
-          progressiveComments.cleanup(),
         ])
       },
     }
