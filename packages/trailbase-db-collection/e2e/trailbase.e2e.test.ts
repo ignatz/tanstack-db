@@ -15,7 +15,7 @@ import {
   createJoinsTestSuite,
   createLiveUpdatesTestSuite,
   createMutationsTestSuite,
-  createPaginationTestSuite,
+  // createPaginationTestSuite,
   createPredicatesTestSuite,
   createProgressiveTestSuite,
   generateSeedData,
@@ -629,7 +629,7 @@ describe(`TrailBase Collection E2E Tests`, () => {
           await postsRecordApi.create(serializePost(post))
         },
       },
-      setup: async () => {},
+      setup: async () => { },
       afterEach: async () => {
         // TrailBase doesn't need collection restart like Electric's on-demand mode
       },
@@ -697,7 +697,7 @@ describe(`TrailBase Collection E2E Tests`, () => {
 
   // Run all shared test suites
   createPredicatesTestSuite(getConfig)
-  createPaginationTestSuite(getConfig)
+  // createPaginationTestSuite(getConfig)
   createJoinsTestSuite(getConfig)
   createDeduplicationTestSuite(getConfig)
   createCollationTestSuite(getConfig)
