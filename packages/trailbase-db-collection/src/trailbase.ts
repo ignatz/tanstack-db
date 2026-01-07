@@ -329,7 +329,6 @@ export function trailBaseCollectionOptions<
       }
     },
     // Expose the getSyncMetadata function
-    // getSyncMetadata: undefined,
     getSyncMetadata: () =>
       ({
         syncMode: internalSyncMode,
